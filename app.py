@@ -1,8 +1,10 @@
+# app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
-import main
 import time
+import main
+import os
 
 st.set_page_config(page_title="Real-Time ICU Monitor", layout="wide")
 st.title("🏥 Real-Time Newborn ICU Monitor")
@@ -39,7 +41,7 @@ if selected_patient == "":
     st.stop()
 
 # -------------------------------
-# Initialize session state for live chart
+# Initialize session state
 # -------------------------------
 if "run_monitor" not in st.session_state:
     st.session_state.run_monitor = False
@@ -68,6 +70,8 @@ latest_placeholder = st.empty()
 # -------------------------------
 # Real-Time Monitoring Loop
 # -------------------------------
+alert_file = "alert.mp3"  # must exist in repo
+
 if st.session_state.run_monitor:
     while st.session_state.run_monitor:
         # Simulate vital readings
@@ -76,7 +80,13 @@ if st.session_state.run_monitor:
         blood_pressure = np.random.randint(60, 100)
 
         # Predict status
-        status = main.predict_function([heart_rate, oxygen_level, blood_pressure])
+        high_risk = main.predict_function([heart_rate, oxygen_level, blood_pressure]) == 1
+        status = "⚠️ ALERT!" if high_risk else "✅ Safe"
+
+        # Play sound if high risk
+        if high_risk and os.path.exists(alert_file):
+            with open(alert_file, "rb") as f:
+                st.audio(f.read(), format="audio/mp3")
 
         # Save to database
         main.save_reading(selected_patient, heart_rate, oxygen_level, blood_pressure, status)
