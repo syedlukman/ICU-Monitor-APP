@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cardiac Arrest Prediction</title>
+</head>
+<body>
+    <h1>Real-Time Cardiac Arrest Prediction</h1>
+    <form method="POST" action="/predict">
+        <input type="text" name="input_value" placeholder="Enter value">
+        <button type="submit">Predict</button>
+    </form>
+    {% if result %}
+        <h2>Result: {{ result }}</h2>
+    {% endif %}
+</body>
+</html>
