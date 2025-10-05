@@ -87,3 +87,22 @@ def get_last_readings(patient_id, n=50):
         conn
     )
     return df.iloc[::-1]  # reverse to chronological order
+# Users table
+c.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE,
+    name TEXT
+)
+""")
+
+# Feedback table
+c.execute("""
+CREATE TABLE IF NOT EXISTS feedback (
+    feedback_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_email TEXT,
+    message TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+""")
+conn.commit()

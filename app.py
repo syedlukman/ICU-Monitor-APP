@@ -65,6 +65,21 @@ st.markdown('<p class="pulse">❤️</p>', unsafe_allow_html=True)
 # Patient Management
 # -------------------------------
 st.sidebar.header("Patient Management")
+st.sidebar.header("User Login")
+login_email = st.sidebar.text_input("Email")
+login_name = st.sidebar.text_input("Name")
+if st.sidebar.button("Login"):
+    try:
+        main.c.execute(
+            "INSERT INTO users (email, name) VALUES (?, ?)",
+            (login_email, login_name)
+        )
+        main.conn.commit()
+        st.success(f"Logged in as {login_email}")
+        st.session_state.user_email = login_email
+    except:
+        st.warning("Email already registered. Logged in.")
+        st.session_state.user_email = login_email
 
 # Add new patient
 with st.sidebar.expander("Add New Patient"):
@@ -184,3 +199,15 @@ historical = pd.read_sql_query(
     main.conn
 )
 st.dataframe(historical)
+st.subheader("Feedback")
+feedback_msg = st.text_area("Enter your feedback or suggestions")
+if st.button("Submit Feedback"):
+    if "user_email" in st.session_state:
+        main.c.execute(
+            "INSERT INTO feedback (user_email, message) VALUES (?, ?)",
+            (st.session_state.user_email, feedback_msg)
+        )
+        main.conn.commit()
+        st.success("Thank you for your feedback!")
+    else:
+        st.error("Please login first to submit feedback.")
