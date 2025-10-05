@@ -1,168 +1,116 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Real-Time ICU Monitor By syed lukman</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICU Real-Time Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background-color: #0b1e2d;
-            color: #fff;
-        }
-        header {
-            background-color: #001f3f;
-            padding: 20px;
-            text-align: center;
-            color: #00e6e6;
-        }
-        .container {
-            display: flex;
-            flex-wrap: wrap;
-            padding: 20px;
-            justify-content: space-around;
-        }
-        .card {
-            background-color: #142b3b;
-            padding: 20px;
-            border-radius: 15px;
-            margin: 10px;
-            width: 300px;
-            box-shadow: 0 0 15px #00e6e6;
-        }
-        input, button {
-            padding: 10px;
-            margin: 5px 0;
-            width: 100%;
-            border-radius: 8px;
-            border: none;
-            font-size: 16px;
-        }
-        button {
-            background-color: #0077ff;
-            color: white;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        button:hover {
-            background-color: #00e6e6;
-            color: black;
-        }
-        #result {
-            margin-top: 10px;
-            padding: 10px;
-            font-size: 18px;
-            text-align: center;
-            border-radius: 10px;
-        }
-        canvas {
-            background-color: #001f3f;
-            border-radius: 15px;
-            margin-top: 20px;
-        }
+        body { font-family: 'Arial', sans-serif; background-color: #f4f6f9; }
+        .navbar { background-color: #2a9d8f; }
+        .navbar-brand { color: white; font-weight: bold; }
+        .card { border-radius: 10px; box-shadow: 0px 2px 10px rgba(0,0,0,0.1); }
+        .alert-card { color: white; font-weight: bold; border-radius: 10px; padding: 15px; text-align: center; }
+        .feedback-box { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        .submit-btn { background-color: #2a9d8f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        .submit-btn:hover { background-color: #21867a; }
     </style>
 </head>
 <body>
-    <header>
-        <h1>🏥 Real-Time Newborn ICU Monitor</h1>
-    </header>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">🏥 Real-Time ICU Monitor</a>
+        </div>
+    </nav>
 
     <div class="container">
-        <div class="card">
-            <h2>Enter Patient Vitals</h2>
-            <input type="number" id="heart_rate" placeholder="Heart Rate (bpm)">
-            <input type="number" id="oxygen_level" placeholder="Oxygen Level (%)">
-            <input type="number" id="blood_pressure" placeholder="Blood Pressure (mmHg)">
-            <button id="predictBtn">Predict Status</button>
-            <div id="result">Waiting for input...</div>
+        <!-- Patient Selection -->
+        <div class="mb-4">
+            <label for="patientSelect" class="form-label">Select Patient:</label>
+            <select id="patientSelect" class="form-select">
+                <option value="">-- Select Patient --</option>
+            </select>
         </div>
 
-        <div class="card">
-            <h2>Vitals Chart (Last 20 readings)</h2>
-            <canvas id="vitalsChart" width="300" height="250"></canvas>
+        <!-- Metrics Cards -->
+        <div class="row mb-4" id="metricsRow">
+            <div class="col-md-3">
+                <div class="card text-center p-3">
+                    <h5>Heart Rate</h5>
+                    <h3 id="heartRate">--</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center p-3">
+                    <h5>Oxygen Level</h5>
+                    <h3 id="oxygenLevel">--</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center p-3">
+                    <h5>Blood Pressure</h5>
+                    <h3 id="bloodPressure">--</h3>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="alert-card bg-success" id="statusCard">✅ Safe</div>
+            </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="mb-4">
+            <div id="vitalsChart" style="height:400px;"></div>
+        </div>
+
+        <!-- Feedback -->
+        <div class="mb-4">
+            <label for="feedback" class="form-label">Feedback / Notes:</label>
+            <textarea id="feedback" class="feedback-box" placeholder="Enter notes..."></textarea>
+            <button class="submit-btn mt-2" onclick="submitFeedback()">Submit Feedback</button>
         </div>
     </div>
 
-    <audio id="alertSound" src="alert.mp3"></audio>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        const predictBtn = document.getElementById('predictBtn');
-        const resultDiv = document.getElementById('result');
-        const alertSound = document.getElementById('alertSound');
+        // Sample function to update metrics
+        function updateMetrics(hr, ox, bp, status) {
+            document.getElementById("heartRate").innerText = hr + " bpm";
+            document.getElementById("oxygenLevel").innerText = ox + " %";
+            document.getElementById("bloodPressure").innerText = bp + " mmHg";
 
-        // Chart.js setup
-        const ctx = document.getElementById('vitalsChart').getContext('2d');
-        const chartData = {
-            labels: [],
-            datasets: [
-                { label: 'Heart Rate', data: [], borderColor: 'red', fill: false },
-                { label: 'Oxygen Level', data: [], borderColor: 'green', fill: false },
-                { label: 'Blood Pressure', data: [], borderColor: 'blue', fill: false }
-            ]
-        };
-        const vitalsChart = new Chart(ctx, {
-            type: 'line',
-            data: chartData,
-            options: {
-                responsive: true,
-                animation: false,
-                scales: { y: { beginAtZero: true } }
+            const statusCard = document.getElementById("statusCard");
+            if(status === "ALERT") {
+                statusCard.innerText = "⚠️ ALERT!";
+                statusCard.classList.remove("bg-success");
+                statusCard.classList.add("bg-danger");
+            } else {
+                statusCard.innerText = "✅ Safe";
+                statusCard.classList.remove("bg-danger");
+                statusCard.classList.add("bg-success");
             }
-        });
-
-        const maxReadings = 20;
-
-        // Function to add reading to chart
-        function addReadingToChart(hr, ox, bp) {
-            const time = new Date().toLocaleTimeString();
-            chartData.labels.push(time);
-            chartData.datasets[0].data.push(hr);
-            chartData.datasets[1].data.push(ox);
-            chartData.datasets[2].data.push(bp);
-
-            if(chartData.labels.length > maxReadings) {
-                chartData.labels.shift();
-                chartData.datasets.forEach(ds => ds.data.shift());
-            }
-            vitalsChart.update();
         }
 
-        predictBtn.addEventListener('click', async () => {
-            const hr = parseInt(document.getElementById('heart_rate').value);
-            const ox = parseInt(document.getElementById('oxygen_level').value);
-            const bp = parseInt(document.getElementById('blood_pressure').value);
+        // Sample function to plot chart
+        function plotVitals(timestamps, heartRates, oxygenLevels, bloodPressures) {
+            const trace1 = { x: timestamps, y: heartRates, type: 'scatter', name: 'Heart Rate' };
+            const trace2 = { x: timestamps, y: oxygenLevels, type: 'scatter', name: 'Oxygen Level' };
+            const trace3 = { x: timestamps, y: bloodPressures, type: 'scatter', name: 'Blood Pressure' };
+            const layout = { title: 'Vitals Over Time', margin: { t: 50 } };
+            Plotly.newPlot('vitalsChart', [trace1, trace2, trace3], layout);
+        }
 
-            if(isNaN(hr) || isNaN(ox) || isNaN(bp)) {
-                alert('Please enter all vitals!');
+        function submitFeedback() {
+            const feedback = document.getElementById("feedback").value;
+            if(feedback.trim() === "") {
+                alert("Please enter feedback before submitting.");
                 return;
             }
+            alert("Feedback submitted: " + feedback);
+            document.getElementById("feedback").value = "";
+        }
 
-            // Send to backend API
-            const response = await fetch('/predict', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ heart_rate: hr, oxygen_level: ox, blood_pressure: bp })
-            });
-
-            let status = 'Safe';
-            if(response.ok) {
-                const data = await response.json();
-                status = data.result === 1 ? '⚠️ ALERT!' : '✅ Safe';
-            } else {
-                status = 'Error';
-            }
-
-            resultDiv.innerText = status;
-            resultDiv.style.backgroundColor = status.includes('ALERT') ? '#ff0033' : '#00e600';
-
-            if(status.includes('ALERT')) {
-                alertSound.play();
-            }
-
-            addReadingToChart(hr, ox, bp);
-        });
+        // TODO: Integrate with backend API to fetch patient vitals in real-time
     </script>
 </body>
 </html>
