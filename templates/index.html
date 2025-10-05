@@ -1,47 +1,167 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cardiac Arrest Prediction</title>
+    <title>Real-Time ICU Monitor</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        h1 { color: #333; }
-        input, button { padding: 10px; font-size: 16px; margin-right: 10px; }
-        button { cursor: pointer; }
-        #result { margin-top: 20px; font-weight: bold; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #0b1e2d;
+            color: #fff;
+        }
+        header {
+            background-color: #001f3f;
+            padding: 20px;
+            text-align: center;
+            color: #00e6e6;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 20px;
+            justify-content: space-around;
+        }
+        .card {
+            background-color: #142b3b;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 10px;
+            width: 300px;
+            box-shadow: 0 0 15px #00e6e6;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+        }
+        button {
+            background-color: #0077ff;
+            color: white;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover {
+            background-color: #00e6e6;
+            color: black;
+        }
+        #result {
+            margin-top: 10px;
+            padding: 10px;
+            font-size: 18px;
+            text-align: center;
+            border-radius: 10px;
+        }
+        canvas {
+            background-color: #001f3f;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
-    <h1>Real-Time Cardiac Arrest Prediction</h1>
-    <form id="predictForm">
-        <input type="text" id="input_value" name="input_value" placeholder="Enter value">
-        <button type="submit">Predict</button>
-    </form>
-    <div id="result"></div>
+    <header>
+        <h1>🏥 Real-Time Newborn ICU Monitor</h1>
+    </header>
 
+    <div class="container">
+        <div class="card">
+            <h2>Enter Patient Vitals</h2>
+            <input type="number" id="heart_rate" placeholder="Heart Rate (bpm)">
+            <input type="number" id="oxygen_level" placeholder="Oxygen Level (%)">
+            <input type="number" id="blood_pressure" placeholder="Blood Pressure (mmHg)">
+            <button id="predictBtn">Predict Status</button>
+            <div id="result">Waiting for input...</div>
+        </div>
+
+        <div class="card">
+            <h2>Vitals Chart (Last 20 readings)</h2>
+            <canvas id="vitalsChart" width="300" height="250"></canvas>
+        </div>
+    </div>
+
+    <audio id="alertSound" src="alert.mp3"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        document.getElementById("predictForm").addEventListener("submit", async function(event) {
-            event.preventDefault();
-            const inputVal = document.getElementById("input_value").value.trim();
+        const predictBtn = document.getElementById('predictBtn');
+        const resultDiv = document.getElementById('result');
+        const alertSound = document.getElementById('alertSound');
 
-            // Simple validation
-            if (!inputVal) {
-                alert("Please enter a value");
+        // Chart.js setup
+        const ctx = document.getElementById('vitalsChart').getContext('2d');
+        const chartData = {
+            labels: [],
+            datasets: [
+                { label: 'Heart Rate', data: [], borderColor: 'red', fill: false },
+                { label: 'Oxygen Level', data: [], borderColor: 'green', fill: false },
+                { label: 'Blood Pressure', data: [], borderColor: 'blue', fill: false }
+            ]
+        };
+        const vitalsChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                animation: false,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+
+        const maxReadings = 20;
+
+        // Function to add reading to chart
+        function addReadingToChart(hr, ox, bp) {
+            const time = new Date().toLocaleTimeString();
+            chartData.labels.push(time);
+            chartData.datasets[0].data.push(hr);
+            chartData.datasets[1].data.push(ox);
+            chartData.datasets[2].data.push(bp);
+
+            if(chartData.labels.length > maxReadings) {
+                chartData.labels.shift();
+                chartData.datasets.forEach(ds => ds.data.shift());
+            }
+            vitalsChart.update();
+        }
+
+        predictBtn.addEventListener('click', async () => {
+            const hr = parseInt(document.getElementById('heart_rate').value);
+            const ox = parseInt(document.getElementById('oxygen_level').value);
+            const bp = parseInt(document.getElementById('blood_pressure').value);
+
+            if(isNaN(hr) || isNaN(ox) || isNaN(bp)) {
+                alert('Please enter all vitals!');
                 return;
             }
 
-            // Call backend prediction API
-            const response = await fetch("/predict", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ input_value: inputVal })
+            // Send to backend API
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ heart_rate: hr, oxygen_level: ox, blood_pressure: bp })
             });
 
-            if (response.ok) {
+            let status = 'Safe';
+            if(response.ok) {
                 const data = await response.json();
-                document.getElementById("result").innerText = "Result: " + data.result;
+                status = data.result === 1 ? '⚠️ ALERT!' : '✅ Safe';
             } else {
-                document.getElementById("result").innerText = "Prediction failed. Please try again.";
+                status = 'Error';
             }
+
+            resultDiv.innerText = status;
+            resultDiv.style.backgroundColor = status.includes('ALERT') ? '#ff0033' : '#00e600';
+
+            if(status.includes('ALERT')) {
+                alertSound.play();
+            }
+
+            addReadingToChart(hr, ox, bp);
         });
     </script>
 </body>

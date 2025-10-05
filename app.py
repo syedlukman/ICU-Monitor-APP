@@ -6,16 +6,65 @@ import base64
 import main
 import os
 
-
+# -------------------------------
+# Page Config & Styling
+# -------------------------------
 st.set_page_config(page_title="Real-Time ICU Monitor", layout="wide")
-st.title("🏥 Real-Time Newborn ICU Monitor")
 
+# Custom CSS for stylish dashboard
+st.markdown("""
+<style>
+.main {
+    background-color: #0b1e2d;
+    color: white;
+    font-family: 'Poppins', sans-serif;
+}
+h1 {
+    color: #00e6e6;
+    text-align: center;
+    font-size: 2.8rem;
+}
+.stButton>button {
+    background-color: #0077ff;
+    color: white;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: 0.3s;
+}
+.stButton>button:hover {
+    background-color: #00e6e6;
+    color: black;
+}
+.status-card {
+    background-color: #142b3b;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0px 0px 10px #00e6e6;
+    text-align: center;
+    margin-bottom: 15px;
+}
+.pulse {
+    animation: heartbeat 1.5s infinite;
+    color: #ff0033;
+    font-size: 25px;
+}
+@keyframes heartbeat {
+    0% { transform: scale(1); }
+    25% { transform: scale(1.3); }
+    50% { transform: scale(1); }
+    75% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("<h1>🏥 Real-Time Newborn ICU Monitor</h1>", unsafe_allow_html=True)
+st.markdown('<p class="pulse">❤️</p>', unsafe_allow_html=True)
 
 # -------------------------------
 # Patient Management
 # -------------------------------
 st.sidebar.header("Patient Management")
-
 
 # Add new patient
 with st.sidebar.expander("Add New Patient"):
@@ -33,18 +82,15 @@ with st.sidebar.expander("Add New Patient"):
         except:
             st.error("Patient ID must be unique.")
 
-
 # Select patient
 st.sidebar.header("Select Patient")
 patients = pd.read_sql_query("SELECT * FROM patients", main.conn)
 patient_options = patients["patient_id"].tolist()
 selected_patient = st.sidebar.selectbox("Patient ID", [""] + patient_options)
 
-
 if selected_patient == "":
     st.warning("Please select a patient to start monitoring.")
     st.stop()
-
 
 # -------------------------------
 # Initialize session state
@@ -52,13 +98,14 @@ if selected_patient == "":
 if "run_monitor" not in st.session_state:
     st.session_state.run_monitor = False
 
-
 if "stop_monitor" not in st.session_state:
     st.session_state.stop_monitor = False
 
+if "prev_status" not in st.session_state:
+    st.session_state.prev_status = "✅ Safe"
 
 # -------------------------------
-# Hidden audio playback function
+# Hidden audio playback
 # -------------------------------
 def play_audio_hidden(audio_file_path):
     with open(audio_file_path, "rb") as f:
@@ -71,6 +118,7 @@ def play_audio_hidden(audio_file_path):
         """
         st.markdown(md, unsafe_allow_html=True)
 
+alert_file = "alert.mp3"  # make sure this file exists in repo
 
 # -------------------------------
 # Live Monitor Controls
@@ -81,62 +129,51 @@ with col1:
         st.session_state.run_monitor = True
         st.session_state.stop_monitor = False
 
-
 with col2:
     if st.button("Stop Monitor"):
         st.session_state.run_monitor = False
         st.session_state.stop_monitor = True
 
-
-# Placeholder for chart and latest reading
+# Placeholders for charts and latest reading
 chart_placeholder = st.empty()
 latest_placeholder = st.empty()
-
 
 # -------------------------------
 # Real-Time Monitoring Loop
 # -------------------------------
-alert_file = "alert.mp3"  # must exist in repo
-
-
 if st.session_state.run_monitor:
     while st.session_state.run_monitor:
-        # Simulate vital readings
+        # Simulate vitals
         heart_rate = np.random.randint(80, 160)
         oxygen_level = np.random.randint(85, 100)
         blood_pressure = np.random.randint(60, 100)
-
 
         # Predict status
         high_risk = main.predict_function([heart_rate, oxygen_level, blood_pressure]) == 1
         status = "⚠️ ALERT!" if high_risk else "✅ Safe"
 
+        # Play alert only if status changes to ALERT
+        if high_risk and st.session_state.prev_status != "⚠️ ALERT!":
+            if os.path.exists(alert_file):
+                play_audio_hidden(alert_file)
 
-        # Play sound if high risk without displaying audio player
-        if high_risk and os.path.exists(alert_file):
-            play_audio_hidden(alert_file)
+        st.session_state.prev_status = status
 
-
-        # Save to database
+        # Save reading to DB
         main.save_reading(selected_patient, heart_rate, oxygen_level, blood_pressure, status)
-
 
         # Fetch last 50 readings
         readings = main.get_last_readings(selected_patient, n=50)
 
-
         # Display latest reading
-        latest_placeholder.subheader("Latest Reading")
-        latest_placeholder.write(readings.iloc[-1])
-
+        latest_placeholder.markdown(f'<div class="status-card"><h3>Latest Reading</h3>{readings.iloc[-1].to_dict()}</div>', unsafe_allow_html=True)
 
         # Display live chart
         chart_data = readings[["heart_rate", "oxygen_level", "blood_pressure"]]
         chart_placeholder.line_chart(chart_data)
 
-
-        time.sleep(1)
-
+        # Realistic pace
+        time.sleep(2.5)
 
 # -------------------------------
 # Historical Data
